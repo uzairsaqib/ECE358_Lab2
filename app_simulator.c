@@ -39,7 +39,7 @@ typedef struct
     double      A;
     double      L;
     double      R;
-    double      N;
+    int	        N;
     double      D;
     double      S;
 
@@ -129,7 +129,7 @@ static double app_simulator_persistent_sensing(void)
     double node_heads[app_simulator_data.N];
 
     // Check to see if bus is occupied. If occupied, Update the other node times to accomodate
-    if(!Queue_IsEmpty(app_simulator_data.shared_bus))
+    if(app_simulator_data.shared_bus->size != 0)
     {
         for (i = 0; i < app_simulator_data.N; i++)
         {
@@ -141,7 +141,7 @@ static double app_simulator_persistent_sensing(void)
 
         // Calculate time to send to each node and them update the queues if needed
         localSendTime = app_simulator_data.T_trans + (app_simulator_data.T_prop * abs(app_simulator_data.shared_bus_sending_node-i));
-        if (localSendTime > app_simulator.simulationTimeSecs) 
+        if (localSendTime > app_simulator_data.simulationTimeSecs) 
         {
             continue;
         }
@@ -256,7 +256,8 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
     {
         //node_ptr = malloc(app_simulator_data.N = N, sizeof(Queue *));
         Queue* node_ptr = Queue_Init(APP_SIMULATOR_QUEUE_DEFAULT_SIZE, i);
-        do
+        currentTime = 0;
+	 do
         {
             // Generate random timestamps
             currentTime = timestamp_generate(app_simulator_data.A, currentTime);
@@ -313,86 +314,3 @@ void app_simulator_deinit()
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// BELOW THIS IS A TODO THAT I HAVE NOT TOUCHED YET I JUST COPIED IT
-
-void app_simulator_deinit(void)
-{
-    Queue_Delete(app_simulator_data.arrivalEvents);
-    app_simulator_data.arrivalEvents = NULL;
-
-    Queue_Delete(app_simulator_data.observerEvents);
-    app_simulator_data.observerEvents = NULL;
-
-    Queue_Delete(app_simulator_data.departureEvents);
-    app_simulator_data.departureEvents = NULL;
-}
-
-
-
-void app_simulator_outputResults(void)
-{
-    printf("SIMULATION COMPLETE:\r\n");
-    
-    // Average number of packets in queue
-    #if (APP_SIMULATOR_PROGRESS)
-    printf("TotalPackets: %ld\r\n", app_simulator_data.averagePacketsInBuffer);
-    printf("Observations: %ld\r\n", app_simulator_data.totalObservations);
-    #endif
-
-    double E_n = ((double)app_simulator_data.averagePacketsInBuffer)/((double)app_simulator_data.totalObservations);
-    printf("E[N] = %f\r\n", E_n);
-
-    // P_loss = (lostPackets)/(arrivalPackets + lostPackets) * 100
-    double P_loss = ((double)app_simulator_data.droppedPackets/(double)(app_simulator_data.totalArrivals + app_simulator_data.droppedPackets))*100;
-    printf("P_loss = %f\r\n", P_loss);
-
-    double P_idle = (app_simulator_data.idleTime/app_simulator_data.simulationTimeSecs)*100;
-    printf("P_Idle = %f\r\n\r\n", P_idle);
-}

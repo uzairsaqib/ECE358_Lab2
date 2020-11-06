@@ -6,7 +6,7 @@ TARGET = queueSim
 
 LIBS = -lm
 CC = gcc
-CFLAGS = -g -Wall
+CFLAGS = -g -ggdb -Wall
 
 .PHONY: default all clean
 

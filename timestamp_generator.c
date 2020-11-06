@@ -52,5 +52,5 @@ double timestamp_generate(double lambda, double current_time)
 
 int return_random(int upper)
 {
-    return ( rand() % (upper+1) )
+    return ( rand() % (upper+1) );
 }

@@ -110,12 +110,12 @@ double Queue_PeekTail(const Queue* q)
     return q->arr[q->tail];
 }
 
-void Queue_Increment_Collision(const Queue* q)
+void Queue_Increment_Collision(Queue* q)
 {
   q->collision_counter++;
 }
 
-void Queue_Reset_Collision(const Queue*q)
+void Queue_Reset_Collision(Queue*q)
 {
   q->collision_counter = 0;
 }
@@ -129,7 +129,7 @@ void Queue_update_times(Queue* q, double wait_time)
 {
   int pos = q->head;
   do {
-    q_arr[pos] = wait_time;
+    q->arr[pos] = wait_time;
     ++pos;
-  } while(q_arr[pos]<wait_time)
+  } while(q->arr[pos]<wait_time);
 }

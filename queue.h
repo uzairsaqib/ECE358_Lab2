@@ -94,13 +94,13 @@ double Queue_PeekTail(const Queue *q);
  * @brief Incremet the queue collision count
  * @param q Queue to operate on 
  */
-void Queue_Increment_Collision(const Queue* q);
+void Queue_Increment_Collision(Queue* q);
 
 /**
  * @brief Reset the collision counter of a queue to 0
  * @param q Queue to operate on 
  */
-void Queue_Reset_Collision(const Queue*q);
+void Queue_Reset_Collision(Queue*q);
 
 /**
  * @brief Get the queue collision count
