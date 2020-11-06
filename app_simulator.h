@@ -33,7 +33,7 @@ typedef enum
 /**
  *  @brief  Initialize the simulator application
  */
-void app_simulator_init(double simulationTimeSec, double A, double L, double R, double N, double D, double S, int64_t max_buffer_size);
+void app_simulator_init(double simulationTimeSec, double A, double L, double R, double N, double D, double S);
 
 /**
  *  @brief  De-initialize the simulator application
@@ -42,13 +42,13 @@ void app_simulator_deinit(void);
 
 /**
  *  @brief  Run the simulation
- *  @return Can take any value of type app_simulator_retCode_E
+ *  @return Current time value
  */
-app_simulator_retCode_E app_simulator_run(void);
+double app_simulator_run(void);
 
-/**
- *  @brief  Output the results of the simulation
- */
-void app_simulator_outputResults(void);
+// /**
+//  *  @brief  Output the results of the simulation
+//  */
+// void app_simulator_outputResults(void);
 
 #endif /* APP_SIMULATOR_H */
