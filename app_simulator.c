@@ -79,10 +79,11 @@ static void app_simulator_persistent_sensing(void);
 /**
  * @brief Perform operations on a node when collision is detected
  */
-
 static void app_simulator_collision_detected(Queue* node);
 
-
+/**
+ * @brief Check to see if current node head is scheduled to arrive before bus send is over. If so, update node values
+ */
 static void app_simulator_bus_busy(Queue* node, double localSendTime);
 
 /*************************************************************************

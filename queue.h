@@ -90,12 +90,26 @@ double Queue_PeekHead(const Queue *q);
  */
 double Queue_PeekTail(const Queue *q);
 
-
+/**
+ * @brief Incremet the queue collision count
+ * @param q Queue to operate on 
+ */
 void Queue_Increment_Collision(const Queue* q);
 
+/**
+ * @brief Reset the collision counter of a queue to 0
+ * @param q Queue to operate on 
+ */
 void Queue_Reset_Collision(const Queue*q);
 
+/**
+ * @brief Get the queue collision count
+ * @param q Queue to operate on 
+ * @return Amount of collisions detected by the queue
+ */
 int Queue_Collision_Count(const Queue* q);
+
+
 
 /**
  * @brief Update the values of a queue's packets
