@@ -1,18 +1,16 @@
 /**
- *  @file   timestamp_generator.h
- *  @brief  Generate new timestamp API
+ *  @file   app_simulator.h
+ *  @brief  API simulator application
  */
 
-#ifndef TIMESTAMP_GENERATOR_H
-#define TIMESTAMP_GENERATOR_H
+#ifndef APP_SIMULATOR_H
+#define APP_SIMULATOR_H
 
 /*************************************************************************
  *                           I N C L U D E S                             *
  *************************************************************************/
 
 #include <stdint.h>
-#include <stdlib.h>
-#include <math.h>
 
 /*************************************************************************
  *                            D E F I N E S                              *
@@ -22,22 +20,35 @@
  *                            T Y P E D E S                              *
  *************************************************************************/
 
+typedef enum
+{
+    APP_SIMULATOR_RET_SIM_RUNNING,
+    APP_SIMULATOR_RET_SIM_COMPLETE,
+} app_simulator_retCode_E;
+
 /*************************************************************************
  *          P U B L I C   F U N C T I O N   D E C L A R A T I O N S      *
  *************************************************************************/
 
 /**
- *  @brief  Generate times based on exponential distribution
+ *  @brief  Initialize the simulator application
  */
-double exp_generate(double lambda);
+void app_simulator_init(double simulationTimeSec, double A, double L, double R, double N, double D, double S, int64_t max_buffer_size);
 
 /**
- *  @brief  Generate a new timestamp based on an input lambda value and the current time
+ *  @brief  De-initialize the simulator application
  */
-double timestamp_generate(double lambda, double current_time);
+void app_simulator_deinit(void);
 
 /**
- * @brief Select a random integer from 0 to a specified upper bound. Input must be > 0
+ *  @brief  Run the simulation
+ *  @return Can take any value of type app_simulator_retCode_E
  */
-int return_random(int upper);
-#endif /* TIMESTAMP_GENERATOR_H */
+app_simulator_retCode_E app_simulator_run(void);
+
+/**
+ *  @brief  Output the results of the simulation
+ */
+void app_simulator_outputResults(void);
+
+#endif /* APP_SIMULATOR_H */

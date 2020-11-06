@@ -24,7 +24,8 @@
 
 typedef struct
 {
-  int64_t head, tail, size, capacity;
+  int64_t position, head, tail, size, capacity, collision_counter;
+  double backoff_value;
   double* arr;
 } Queue;
 
@@ -35,9 +36,10 @@ typedef struct
 /**
  *  @brief  Creates and initializes a queue object
  *  @param  capacity The maximum size of the queue to create
+ *  @param position The node ID
  *  @return Pointer to the created queue
  */
-Queue* Queue_Init(int64_t capacity);
+Queue* Queue_Init(int64_t capacity, int64_t position);
 
 /**
  *  @brief  Deletes a queue object
@@ -87,5 +89,21 @@ double Queue_PeekHead(const Queue *q);
  *  @return Item at back of queue
  */
 double Queue_PeekTail(const Queue *q);
+
+
+void Queue_Increment_Collision(const Queue* q);
+
+void Queue_Reset_Collision(const Queue*q);
+
+int Queue_Collision_Count(const Queue* q);
+
+/**
+ * @brief Update the values of a queue's packets
+ * until the packets no longer have a value of wait_time.
+ * Assumes that the head MUST be updated
+ * @param wait_time the max wait time to check for
+ * @param q Queue to operate on
+ */
+void Queue_update_times(Queue* q, double wait_time);
 
 #endif /* __QUEUE_H */

@@ -42,9 +42,15 @@ double exp_generate(double lambda)
     return (exp_rand);
 }
 
-double timestamp_generate(double lambda, double current_time) {
+double timestamp_generate(double lambda, double current_time) 
+{
     double u_rand = (double)rand() / (double)RAND_MAX;
     double exp_rand = (-1/(double)lambda) * logf( (1 - u_rand));
     
     return (exp_rand + current_time);
+}
+
+int return_random(int upper)
+{
+    return ( rand() % (upper+1) )
 }

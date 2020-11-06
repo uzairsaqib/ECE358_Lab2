@@ -33,12 +33,15 @@
  *                    P U B L I C   F U N C T I O N S                    *
  *************************************************************************/
 
-Queue* Queue_Init(int64_t capacity)
+Queue* Queue_Init(int64_t capacity, int64_t position)
 {
   Queue* q = malloc(sizeof(Queue));
   q->head = 0;
   q->tail = 0;
   q->size = 0;
+  q->backoff_value = 0;
+  q->collision_counter = 0;
+  q->position = position;
   q->capacity = capacity;
   q->arr = malloc(sizeof(double) * capacity);
 
@@ -105,4 +108,28 @@ double Queue_PeekHead(const Queue* q)
 double Queue_PeekTail(const Queue* q)
 {
     return q->arr[q->tail];
+}
+
+void Queue_Increment_Collision(const Queue* q)
+{
+  q->collision_counter++;
+}
+
+void Queue_Reset_Collision(const Queue*q)
+{
+  q->collision_counter = 0;
+}
+
+int Queue_Collision_Count(const Queue* q)
+{
+  return q->collision_counter;
+}
+
+void Queue_update_times(Queue* q, double wait_time)
+{
+  int pos = q->head;
+  do {
+    q_arr[pos] = wait_time;
+    ++pos;
+  } while(q_arr[pos]<wait_time)
 }
