@@ -107,7 +107,15 @@ static void app_simulator_collision_detected(Queue* node)
     {
         // Calculate exponential backoff time and update all Queue values to correspond to this
         double wait_time = (double)K_pick*512.0 + Queue_PeekHead(node);
-        Queue_update_times(node, wait_time);
+       if (wait_time >= app_simulator_data.simulationTimeSecs)
+	{
+	    Queue_Dequeue(node);
+            Queue_Reset_Collision(node);
+	}
+	else
+	{
+		 Queue_update_times(node, wait_time);
+	}
     }
 
 }
