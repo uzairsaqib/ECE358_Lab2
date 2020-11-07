@@ -17,16 +17,17 @@ int main(void)
     double A = 7;
     double L = 1500;
     double R = 1;
-    double N = 20;
+    double N = 5;
     double D = 10;
     double S = (2.0/3.0)*3.0*100000000.0;
     
 
     double timeStamp = 0;
-   
-    while(timeStamp < simTime || timeStamp!= -1)
+
+    app_simulator_init(simTime, A, L, R, N, D, S);
+
+    while(timeStamp < simTime || timeStamp != -1.0)
     {
-    	app_simulator_init(simTime, A, L, R, N, D, S);
         timeStamp =  app_simulator_run();
 	printf("The time is %f\r\n", timeStamp);
     }
