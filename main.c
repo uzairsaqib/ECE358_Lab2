@@ -14,24 +14,25 @@
 int main(void)
 {
     double simTime = 1000.0;
-    double A = 12.0;
+    double A = 5.0;
     double L = 1500.0;
-    double R = 1.0;
-    double N = 100.0;
+    double R = 1000000.0;
+    double N = 60.0;
     double D = 10.0;
     double S = (2.0/3.0)*3.0*100000000.0;
     
 
-    double timeStamp = 0;
+    double timeStamp;
+
 
     app_simulator_init(simTime, A, L, R, N, D, S);
 
 
 
-        while(timeStamp >= 0)
+        while(timeStamp <= simTime)
         {
             timeStamp =  app_simulator_run();
-	    //printf("The time is %f\r\n", timeStamp);
+	   // printf("The time is %f\r\n", timeStamp);
         }
 
     app_simulator_print_results();

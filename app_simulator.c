@@ -163,7 +163,7 @@ static int app_simulator_check_collision(int minTimeNode)
             }
 
             // Update the transmission times of the transmitting node
-            if(Queue_Collision_Count(minTimeNode) > 0)
+            if(Queue_Collision_Count(app_simulator_data.nodes[minTimeNode]) > 0)
             {
                 R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
                 T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
@@ -313,7 +313,7 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
             // Generate random timestamps
             currentTime = timestamp_generate(app_simulator_data.A, currentTime);
 
-            if (currentTime >= app_simulator_data.simulationTimeSecs) // Check this condition. It might mess things up in the logic.
+            if (currentTime >= (app_simulator_data.simulationTimeSecs+10.0)) // Check this condition. It might mess things up in the logic.
             // Maybe should check nodes for this value? not sure
             {
                 currentTime = -1;
@@ -366,7 +366,7 @@ void app_simulator_deinit(void)
 
 void app_simulator_print_results(void)
 {
-    double efficiency = (app_simulator_data.successfully_transmitted_packets/app_simulator_data.successfully_transmitted_packets);
+    double efficiency = ((double)app_simulator_data.successfully_transmitted_packets/(double)app_simulator_data.successfully_transmitted_packets);
 	printf("Transmitted packets %f\r\n", app_simulator_data.transmitted_packets);
 	printf("Successfully transmitted packets %f\r\n", app_simulator_data.successfully_transmitted_packets);
     printf("Efficiency rate %f\r\n", efficiency); 
