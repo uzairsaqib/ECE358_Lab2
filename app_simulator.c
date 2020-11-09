@@ -367,10 +367,12 @@ void app_simulator_deinit(void)
 void app_simulator_print_results(void)
 {
     double efficiency = ((double)app_simulator_data.successfully_transmitted_packets/(double)app_simulator_data.transmitted_packets);
-	printf("Transmitted packets %f\r\n", app_simulator_data.transmitted_packets);
-	printf("Successfully transmitted packets %f\r\n", app_simulator_data.successfully_transmitted_packets);
-    printf("Efficiency rate %f\r\n", efficiency); 
+    double throughput = (app_simulator_data.successfully_transmitted_packets * app_simulator_data.L)/(app_simulator_data.simulationTimeSecs * 1000000);
 
+	printf("Transmitted packets: %f\r\n", app_simulator_data.transmitted_packets);
+	printf("Successfully transmitted packets: %f\r\n", app_simulator_data.successfully_transmitted_packets);
+    printf("Efficiency rate: %f\r\n", efficiency);
+    printf("Throughput: %f Mbps\r\n\r\n", throughput);
 }
 
 
