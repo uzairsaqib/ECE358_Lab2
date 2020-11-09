@@ -81,7 +81,7 @@ static void app_simulator_persistent_sensing(void);
 /**
  * @brief Handle updating times if bus is busy
  */
-static void app_simulator_bus_busy(Queue* node, double localSendTime);
+static void app_simulator_bus_busy(void);
 
 static int app_simulator_find_earliest_timestamp(void);
 
@@ -104,14 +104,19 @@ app_simulator_data_S app_simulator_data;
 static int app_simulator_find_earliest_timestamp(void)
 {
     int minTimeNode;
-    for (i = 0; i < app_simulator_data.N; i++)
+    double minTimeStamp = DBL_MAX;
+    double currentNodeEarliestTimestamp;
+
+
+    for (int i = 0; i < app_simulator_data.N; i++)
         {
             // Check for lowest timestamp
             // TODO: Confirm lowest timestamp against waiting value for exponential backoff
-            node_heads[i] = Queue_PeekHead(app_simulator_data.nodes[i]);
-            if (node_heads[i] < minTimeStamp)
+            currentNodeEarliestTimestamp = Queue_PeekHead(app_simulator_data.nodes[i]);
+            if ((currentNodeEarliestTimestamp != -1) && (currentNodeEarliestTimestamp < minTimeStamp))
             {
                 minTimeNode = i;
+                minTimeStamp = currentNodeEarliestTimestamp;
             }
         }
 
@@ -141,7 +146,7 @@ static int app_simulator_check_collision(int minTimeNode)
             isCollisionDetected = 1;
 
             Queue_Increment_Collision(app_simulator_data.nodes[i]);
-            Queue_Increment_Collision(app_simulator_data.nodes[minTimeNode])
+            Queue_Increment_Collision(app_simulator_data.nodes[minTimeNode]);
 
 
             // Reset if greater than 10
@@ -182,7 +187,7 @@ static int app_simulator_check_collision(int minTimeNode)
 }
 
 
-static void app_simulator_no_collision(int minTimeNode)
+static double app_simulator_no_collision(int minTimeNode)
 {
 
     // Dequeue the node to be transmitted
@@ -192,7 +197,7 @@ static void app_simulator_no_collision(int minTimeNode)
 
     // Reset the collision counter for this node
     Queue_Reset_Collision(app_simulator_data.nodes[minTimeNode]);
-    app_simulator_data.current_time = minTimeStamp;
+    app_simulator_data.current_time = localSendTime;
 
     if (localSendTime == -1)
     {
@@ -203,6 +208,8 @@ static void app_simulator_no_collision(int minTimeNode)
     app_simulator_data.shared_bus.isBusy = 1;
     app_simulator_data.shared_bus.currentTime = localSendTime;
     app_simulator_data.shared_bus.sendingNode = minTimeNode;
+
+    return localSendTime;
 
 }
 
@@ -235,28 +242,29 @@ static void app_simulator_bus_busy(void)
     app_simulator_data.shared_bus.sendingNode = -1;
 }
 
-static void app_simulator_persistent_sensing(void)
+static double app_simulator_persistent_sensing(void)
 {
     int earliestTransmissionNode, isCollision;
-    earliestTransmissionNode = app_simulator_find_earliest_timestamp();
-    isCollision = app_simulator_check_collision(earliestTransmissionNode);
-
+    
     if(app_simulator_data.shared_bus.isBusy)
     {
         app_simulator_bus_busy();
     }
-
+    
+    earliestTransmissionNode = app_simulator_find_earliest_timestamp();
+    isCollision = app_simulator_check_collision(earliestTransmissionNode);
+    double ret;
 
     if (isCollision)
     {
-        return;
+        ret = Queue_PeekHead(app_simulator_data.nodes[earliestTransmissionNode]);
     }
     else
     {
-        app_simulator_no_collision(earliestTransmissionNode)
+        ret = app_simulator_no_collision(earliestTransmissionNode);
     }
     
-
+    return ret;
 }
 
 
@@ -280,7 +288,6 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
     app_simulator_data.T_prop = D/S;
     app_simulator_data.T_trans = L/R;
     app_simulator_data.nodes = malloc(N*sizeof(Queue*));
-    app_simulator_data.shared_bus = Queue_Init(1, -1);
     app_simulator_data.shared_bus.isBusy = 0;
     app_simulator_data.shared_bus.currentTime = 0;
     app_simulator_data.shared_bus.sendingNode = -1;
@@ -350,11 +357,13 @@ void app_simulator_deinit(void)
         Queue_Delete(app_simulator_data.nodes[i]);
         app_simulator_data.nodes[i] = NULL;
     }
+
+    
 }
 
 void app_simulator_print_results(void)
 {
-    double efficiency = (app_simulator_data.successfully_transmitted_packets/app_simulator_data.successfully_transmitted_packets)
+    double efficiency = (app_simulator_data.successfully_transmitted_packets/app_simulator_data.successfully_transmitted_packets);
 	printf("Transmitted packets %f\r\n", app_simulator_data.transmitted_packets);
 	printf("Successfully transmitted packets %f\r\n", app_simulator_data.successfully_transmitted_packets);
     printf("Efficiency rate %f\r\n" efficiency); 
