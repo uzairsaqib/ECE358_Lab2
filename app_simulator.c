@@ -56,6 +56,8 @@ typedef struct
     double      T_prop;
     double      T_trans;
     int         shared_bus_sending_node;
+    double      current_time;
+    int         num_packets_to_send;
 } app_simulator_data_S;
 
 
@@ -71,7 +73,7 @@ static double app_simulator_persistent_sensing(void);
 /**
  * @brief Perform operations on a node when collision is detected
  */
-static void app_simulator_collision_detected(Queue* node);
+static void app_simulator_collision_detected(Queue* node, double currentTime);
 
 /**
  * @brief Check to see if current node head is scheduled to arrive before bus send is over. If so, update node values
@@ -89,16 +91,15 @@ app_simulator_data_S app_simulator_data;
  *************************************************************************/
 
 // Works on a per node basis
-static void app_simulator_collision_detected(Queue* node)
+static void app_simulator_collision_detected(Queue* node, double currentTime)
 {
     int returnCount = 0;
     // Increment the Queue collision counter
     Queue_Increment_Collision(node);
-
     // Choose a random var
-    int K_pick = return_random(Queue_Collision_Count(node));
+    int K_pick = return_random(pow(2,Queue_Collision_Count(node))-1);
 
-    if(K_pick > 10)
+    if(Queue_Collision_Count(node) > 10)
     {
         Queue_Dequeue(node);
         Queue_Reset_Collision(node);
@@ -107,7 +108,7 @@ static void app_simulator_collision_detected(Queue* node)
     else
     {
         // Calculate exponential backoff time and update all Queue values to correspond to this
-        double wait_time = (double)K_pick*512.0 + Queue_PeekHead(node);
+        double wait_time = currentTime + (double)K_pick*512.0*(1/app_simulator_data.R);
         if (wait_time >= app_simulator_data.simulationTimeSecs)
 	{
 	    Queue_Dequeue(node);
@@ -154,7 +155,7 @@ static double app_simulator_persistent_sensing(void)
             }
 
        	    // Calculate time to send to each node and them update the queues if needed
-            localSendTime = app_simulator_data.T_trans + (app_simulator_data.T_prop * abs(app_simulator_data.shared_bus_sending_node-i));
+            localSendTime = app_simulator_data.T_trans*app_simulator_data.num_packets_to_send + (app_simulator_data.T_prop * abs(app_simulator_data.shared_bus_sending_node-i));
             if (localSendTime > app_simulator_data.simulationTimeSecs) 
             {
                 continue;
@@ -163,7 +164,8 @@ static double app_simulator_persistent_sensing(void)
         }
 
         // Dequeue current packet from shared bus.
-        ret = Queue_Dequeue(app_simulator_data.shared_bus);
+        app_simulator_data.num_packets_to_send = 0;
+	ret = Queue_Dequeue(app_simulator_data.shared_bus);
         return ret;
     }
     
@@ -202,9 +204,10 @@ static double app_simulator_persistent_sensing(void)
 
             if (node_heads[i] < localSendTime)
             {
-                isCollisionDetected = 0;
-                app_simulator_collision_detected(app_simulator_data.nodes[i]);
-                ret = minTimeStamp;
+                isCollisionDetected = 1;
+                app_simulator_collision_detected(app_simulator_data.nodes[i], minTimeStamp);
+                app_simulator_collision_detected(app_simulator_data.nodes[minTimeNode],minTimeStamp);
+ 		ret = minTimeStamp;
             }
 
         }
@@ -216,7 +219,10 @@ static double app_simulator_persistent_sensing(void)
                 localSendTime = Queue_Dequeue(app_simulator_data.nodes[minTimeNode]);
                 app_simulator_data.transmitted_packets++;
                 app_simulator_data.successfully_transmitted_packets++;
-            } while(Queue_PeekHead(app_simulator_data.nodes[minTimeNode]) == localSendTime);
+                app_simulator_data.num_packets_to_send++;
+	    } while(Queue_PeekHead(app_simulator_data.nodes[minTimeNode]) == localSendTime);
+       	    Queue_Reset_Collision(app_simulator_data.nodes[minTimeNode]);
+	    
             // next packet arrival time is less than current arrival time but if thats happening then I have a whole other butthole issue
             
             if (localSendTime == -1)
@@ -252,6 +258,7 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
     app_simulator_data.N = N;
     app_simulator_data.D = D;
     app_simulator_data.S = S;
+    app_simulator_data.current_time = 0.0;
     app_simulator_data.T_prop = D/S;
     app_simulator_data.T_trans = L/R;
     app_simulator_data.nodes = malloc(N*sizeof(Queue*));

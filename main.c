@@ -13,11 +13,11 @@
 // QUESTION 
 int main(void)
 {
-    double simTime = 5000.0;
-    double A = 5.0;
+    double simTime = 1000.0;
+    double A = 12.0;
     double L = 1500.0;
     double R = 1.0;
-    double N = 20.0;
+    double N = 100.0;
     double D = 10.0;
     double S = (2.0/3.0)*3.0*100000000.0;
     
@@ -26,13 +26,17 @@ int main(void)
 
     app_simulator_init(simTime, A, L, R, N, D, S);
 
-    while(timeStamp >= 0)
-    {
-        timeStamp =  app_simulator_run();
-	printf("The time is %f\r\n", timeStamp);
-    }
+
+
+        while(timeStamp >= 0)
+        {
+            timeStamp =  app_simulator_run();
+	    //printf("The time is %f\r\n", timeStamp);
+        }
+
     app_simulator_print_results();
     app_simulator_deinit();
+
     
 }
 
