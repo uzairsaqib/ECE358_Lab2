@@ -91,6 +91,7 @@ app_simulator_data_S app_simulator_data;
 // Works on a per node basis
 static void app_simulator_collision_detected(Queue* node)
 {
+    int returnCount = 0;
     // Increment the Queue collision counter
     Queue_Increment_Collision(node);
 
@@ -107,14 +108,17 @@ static void app_simulator_collision_detected(Queue* node)
     {
         // Calculate exponential backoff time and update all Queue values to correspond to this
         double wait_time = (double)K_pick*512.0 + Queue_PeekHead(node);
-       if (wait_time >= app_simulator_data.simulationTimeSecs)
+        if (wait_time >= app_simulator_data.simulationTimeSecs)
 	{
 	    Queue_Dequeue(node);
             Queue_Reset_Collision(node);
 	}
+	// If wait time is not greater than sim time, update all node values less than this wait time to be later than 
+	// this wait time
 	else
 	{
-		 Queue_update_times(node, wait_time);
+		 returnCount = Queue_update_times(node, wait_time);
+		 app_simulator_data.transmitted_packets += returnCount;
 	}
     }
 
@@ -123,9 +127,11 @@ static void app_simulator_collision_detected(Queue* node)
 // Works on a per node basis
 static void app_simulator_bus_busy(Queue* node, double localSendTime)
 {
+    // Dummy var so that I can use the same function
+    int returnCount;
     if (Queue_PeekHead(node) < localSendTime)
     {
-        Queue_update_times(node, localSendTime);
+        returnCount =  Queue_update_times(node, localSendTime);
     }
 }
 
@@ -147,13 +153,13 @@ static double app_simulator_persistent_sensing(void)
                 continue;
             }
 
-        // Calculate time to send to each node and them update the queues if needed
-        localSendTime = app_simulator_data.T_trans + (app_simulator_data.T_prop * abs(app_simulator_data.shared_bus_sending_node-i));
-        if (localSendTime > app_simulator_data.simulationTimeSecs) 
-        {
-            continue;
-        }
-        app_simulator_bus_busy(app_simulator_data.nodes[i], localSendTime);
+       	    // Calculate time to send to each node and them update the queues if needed
+            localSendTime = app_simulator_data.T_trans + (app_simulator_data.T_prop * abs(app_simulator_data.shared_bus_sending_node-i));
+            if (localSendTime > app_simulator_data.simulationTimeSecs) 
+            {
+                continue;
+            }
+            app_simulator_bus_busy(app_simulator_data.nodes[i], localSendTime);
         }
 
         // Dequeue current packet from shared bus.
@@ -196,8 +202,7 @@ static double app_simulator_persistent_sensing(void)
 
             if (node_heads[i] < localSendTime)
             {
-                isCollisionDetected = 1;
-                app_simulator_data.transmitted_packets++;
+                isCollisionDetected = 0;
                 app_simulator_collision_detected(app_simulator_data.nodes[i]);
                 ret = minTimeStamp;
             }
@@ -207,11 +212,11 @@ static double app_simulator_persistent_sensing(void)
         if (!isCollisionDetected)
         {
             // Dequeue packet
-            do {
+            do{
                 localSendTime = Queue_Dequeue(app_simulator_data.nodes[minTimeNode]);
                 app_simulator_data.transmitted_packets++;
                 app_simulator_data.successfully_transmitted_packets++;
-            } while(Queue_PeekHead(app_simulator_data.nodes[minTimeNode]) == localSendTime); // Maybe change this to <= in case scenario of
+            } while(Queue_PeekHead(app_simulator_data.nodes[minTimeNode]) == localSendTime);
             // next packet arrival time is less than current arrival time but if thats happening then I have a whole other butthole issue
             
             if (localSendTime == -1)
@@ -310,7 +315,7 @@ double app_simulator_run(void)
     
 }
 
-void app_simulator_deinit()
+void app_simulator_deinit(void)
 {
     for (int i = 0; i < app_simulator_data.N; i++)
     {
@@ -319,6 +324,11 @@ void app_simulator_deinit()
     }
 }
 
+void app_simulator_print_results(void)
+{
+	printf("Transmitted packets %f\r\n", app_simulator_data.transmitted_packets);
+	printf("Success packets %f\r\n", app_simulator_data.successfully_transmitted_packets);
 
+}
 
 

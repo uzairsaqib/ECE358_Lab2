@@ -125,11 +125,15 @@ int Queue_Collision_Count(const Queue* q)
   return q->collision_counter;
 }
 
-void Queue_update_times(Queue* q, double wait_time)
+int Queue_update_times(Queue* q, double wait_time)
 {
   int pos = q->head;
+  int count = 0;
   do {
     q->arr[pos] = wait_time;
     ++pos;
+    ++count;
   } while(q->arr[pos]<wait_time);
+  return count;
 }
+

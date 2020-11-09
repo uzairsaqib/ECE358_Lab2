@@ -47,6 +47,8 @@ void app_simulator_deinit(void);
  */
 double app_simulator_run(void);
 
+void app_simulator_print_results(void);
+
 // /**
 //  *  @brief  Output the results of the simulation
 //  */
