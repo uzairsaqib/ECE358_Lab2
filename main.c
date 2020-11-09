@@ -20,36 +20,17 @@ int main(void)
     double N = 60.0;
     double D = 10.0;
     double S = (2.0/3.0)*3.0*100000000.0;
-    
-
-    double timeStamp;
-
 
     app_simulator_init(simTime, A, L, R, N, D, S);
 
-
-
-        while(timeStamp <= simTime)
-        {
-            timeStamp =  app_simulator_run();
-	   // printf("The time is %f\r\n", timeStamp);
-        }
+    double timeStamp = 0;
+    while(timeStamp <= simTime)
+    {
+        timeStamp =  app_simulator_run();
+    }
 
     app_simulator_print_results();
     app_simulator_deinit();
 
     
 }
-
-/*
-int main(void)
-{
-    app_simulator_init(100);
-
-    while (app_simulator_run() != APP_SIMULATOR_RET_SIM_COMPLETE);
-
-    app_simulator_outputResults();
-
-    return 0;
-}
-*/
