@@ -135,6 +135,95 @@ static void app_simulator_bus_busy(Queue* node, double localSendTime)
     }
 }
 
+/**
+ *  @brief  Finds the earliest timestamp in all the nodes
+ *  @return Index of node with earliest timestamp
+ */
+unsigned int app_simulator_private_findEarliestTimestamp(void)
+{
+    double minTimeStamp = DBL_MAX;
+
+    for (unsigned int i = 0; i < app_simulator_data.N; i++)
+    {
+        double currentNodeEarliestTimestamp = Queue_PeekHead(app_simulator_data.nodes[i]);
+
+        if ((currentNodeEarliestTimestamp != -1) && (currentNodeEarliestTimestamp < minTimeStamp))
+        {
+            minTimeStamp = currentNodeEarliestTimestamp;
+        }
+    }
+}
+
+/**
+ *  @brief  Checks if a collision would occur due to failure to check
+ *          if the bus is busy
+ *  @return true if a collision was detected,
+ *          false otherwise
+ */
+bool app_simulator_private_checkCollision(unsigned int transmittingNode)
+{
+    bool collisionDetected = false;
+    double transmissionTimestamp = Queue_PeekHead(app_simulator_data.nodes[transmittingNode]);
+
+    for (unsigned int i = 0; i < app_simulator_data.N; i++)
+    {
+        double curNodeNextTransmissionTimestamp = Queue_PeekHead(app_simulator_data.nodes[i]);
+        if ((i == transmittingNode) || (curNodeNextTransmissionTimestamp == -1))
+        {
+            continue;
+        }
+
+        double firstBitArrivalTime = transmissionTimestamp + (app_simulator_data.T_prop*(abs(transmittingNode - i)));
+
+        /** 
+         *  If the first bit arrival time is after the earliest timestamp in the node, then the node will
+         *  try to send its frame while the bus is busy and a collision will occur
+         */
+        if (firstBitArrivalTime > curNodeNextTransmissionTimestamp)
+        {
+            collisionDetected = true;
+
+            // Increment collision counters for both nodes involved in the collision
+            Queue_Increment_Collision(app_simulator_data.nodes[transmittingNode]);
+            Queue_Increment_Collision(app_simulator_data.nodes[i]);
+
+            /**
+             *  If either of the nodes involved in the collision have experienced 10 consecutive
+             *  then the nodes should drop their respective packet and reset their counters
+             */
+            if (Queue_Collision_Count(app_simulator_data.nodes[transmittingNode]) == 10)
+            {
+                Queue_Dequeue(app_simulator_data.nodes[transmittingNode]);
+                Queue_Reset_Collision(app_simulator_data.nodes[transmittingNode]);
+            }
+            if (Queue_Collision_Count(app_simulator_data.nodes[i]) == 10)
+            {
+                Queue_Dequeue(app_simulator_data.nodes[i]);
+                Queue_Reset_Collision(app_simulator_data.nodes[i]);
+            }
+
+            // Update the transmission times of the transmitting node
+            double R = return_random(pow(2, Queue_Collision_Count(transmittingNode)) - 1);
+            double T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+            double unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[transmittingNode]);
+            Queue_update_times(app_simulator_data.nodes[transmittingNode], unblockTimestamp);
+
+            // Update the transmission times of the current node
+            R = return_random(pow(2, Queue_Collision_Count(i)) - 1);
+            T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+            unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[i]);
+            Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
+        }
+    }
+
+    return collisionDetected;
+}
+
+void app_simulator_persistent_sensing(void)
+{
+    unsigned int earliestNodeIndex = app_simulator_private_findEarliestTimestamp();
+}
+
 static double app_simulator_persistent_sensing(void)
 {
     int i, minTimeNode, isCollisionDetected = 0;
@@ -166,7 +255,6 @@ static double app_simulator_persistent_sensing(void)
         ret = Queue_Dequeue(app_simulator_data.shared_bus);
         return ret;
     }
-    
     else {
 
         // Bus is empty. Can send packet
