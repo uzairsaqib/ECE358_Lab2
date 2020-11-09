@@ -76,7 +76,7 @@ typedef struct
 /**
  * @brief Persistent carrier sensing
  */
-static void app_simulator_persistent_sensing(void);
+static double app_simulator_persistent_sensing(void);
 
 /**
  * @brief Handle updating times if bus is busy
@@ -87,7 +87,7 @@ static int app_simulator_find_earliest_timestamp(void);
 
 static int app_simulator_check_collision(int minTimeNode);
 
-static void app_simulator_no_collision(int minTimeNode);
+static double app_simulator_no_collision(int minTimeNode);
 /*************************************************************************
  *            P R I V A T E   D A T A   D E C L A R A T I O N S          *
  *************************************************************************/
@@ -180,10 +180,9 @@ static int app_simulator_check_collision(int minTimeNode)
             
 
         }
-
-        return isCollisionDetected;
-
+        
     }
+    return isCollisionDetected;
 }
 
 
@@ -358,7 +357,7 @@ void app_simulator_deinit(void)
         app_simulator_data.nodes[i] = NULL;
     }
 
-    
+
 }
 
 void app_simulator_print_results(void)
@@ -366,7 +365,7 @@ void app_simulator_print_results(void)
     double efficiency = (app_simulator_data.successfully_transmitted_packets/app_simulator_data.successfully_transmitted_packets);
 	printf("Transmitted packets %f\r\n", app_simulator_data.transmitted_packets);
 	printf("Successfully transmitted packets %f\r\n", app_simulator_data.successfully_transmitted_packets);
-    printf("Efficiency rate %f\r\n" efficiency); 
+    printf("Efficiency rate %f\r\n", efficiency); 
 
 }
 

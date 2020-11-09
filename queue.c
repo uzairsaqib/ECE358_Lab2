@@ -135,6 +135,5 @@ void Queue_update_times(Queue* q, double wait_time)
     ++pos;
     ++count;
   } 
-  return count;
 }
 
