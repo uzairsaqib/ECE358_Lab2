@@ -127,7 +127,7 @@ static int app_simulator_find_earliest_timestamp(void)
 static int app_simulator_check_collision(int minTimeNode)
 {
     int isCollisionDetected = 0;
-    double localSendTime = 0, currentNodeTimestamp;
+    double localSendTime = 0, currentNodeTimestamp, R, T_waiting, unblockTimestamp;
     double currTransmissionTime = Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
     for (int i = 0; i < app_simulator_data.N; i++)
     {
@@ -160,23 +160,27 @@ static int app_simulator_check_collision(int minTimeNode)
             {
                 Queue_Dequeue(app_simulator_data.nodes[i]);
                 Queue_Reset_Collision(app_simulator_data.nodes[i]);
-                return isCollisionDetected;
             }
 
             // Update the transmission times of the transmitting node
-            double R = return_random(pow(2, Queue_Collision_Count(transmittingNode)) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
-            double T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-            double unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
-            Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
-            app_simulator_data.transmitted_packets++;
+            if(Queue_Collision_Count(minTimeNode) > 0)
+            {
+                R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
+                T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+                unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
+                Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
+                app_simulator_data.transmitted_packets++;
+            }
 
             // Update the transmission times of the current node
-            R = return_random(pow(2, Queue_Collision_Count(i)) - 1);
-            T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-            unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[i]);
-            Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
-            app_simulator_data.transmitted_packets++;
-
+            if(Queue_Collision_Count(app_simulator_data.nodes[i]) > 0)
+            {
+                R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[i])) - 1);
+                T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+                unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[i]);
+                Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
+                app_simulator_data.transmitted_packets++;
+            }
             
 
         }
