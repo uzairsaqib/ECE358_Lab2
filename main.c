@@ -17,20 +17,21 @@ int main(void)
     double A = 5.0;
     double L = 1500.0;
     double R = 1000000.0;
-    double N = 60.0;
     double D = 10.0;
     double S = (2.0/3.0)*3.0*100000000.0;
 
-    app_simulator_init(simTime, A, L, R, N, D, S);
-
     double timeStamp = 0;
-    while(timeStamp <= simTime)
+    for (double N = 20; N < 120; N += 20)
     {
-        timeStamp =  app_simulator_run();
+        app_simulator_init(simTime, A, L, R, N, D, S);
+
+        while(timeStamp <= simTime)
+        {
+            timeStamp =  app_simulator_run();
+        }
+
+        app_simulator_print_results();
+        app_simulator_deinit();
+        timeStamp = 0;
     }
-
-    app_simulator_print_results();
-    app_simulator_deinit();
-
-    
 }
