@@ -118,6 +118,6 @@ int Queue_Collision_Count(const Queue* q);
  * @param wait_time the max wait time to check for
  * @param q Queue to operate on
  */
-int Queue_update_times(Queue* q, double wait_time);
+void Queue_update_times(Queue* q, double wait_time);
 
 #endif /* __QUEUE_H */

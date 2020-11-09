@@ -32,6 +32,14 @@ typedef enum
     APP_SIMULATOR_NODE
 } app_simulator_queueType_E;
 
+typedef struct 
+{
+    double      currentTime;
+    int         isBusy;
+    int         sendingNode;
+} shared_bus_S;
+
+
 typedef struct
 {
     // SIM PARAMETERS
@@ -44,8 +52,8 @@ typedef struct
     double      S;
 
     // NODES
-    Queue** nodes;
-    Queue* shared_bus;
+    Queue**         nodes;
+    shared_bus_S    shared_bus;
     
 
     // METRICS
@@ -68,18 +76,18 @@ typedef struct
 /**
  * @brief Persistent carrier sensing
  */
-static double app_simulator_persistent_sensing(void);
+static void app_simulator_persistent_sensing(void);
 
 /**
- * @brief Perform operations on a node when collision is detected
- */
-static void app_simulator_collision_detected(Queue* node, double currentTime);
-
-/**
- * @brief Check to see if current node head is scheduled to arrive before bus send is over. If so, update node values
+ * @brief Handle updating times if bus is busy
  */
 static void app_simulator_bus_busy(Queue* node, double localSendTime);
 
+static int app_simulator_find_earliest_timestamp(void);
+
+static int app_simulator_check_collision(int minTimeNode);
+
+static void app_simulator_no_collision(int minTimeNode);
 /*************************************************************************
  *            P R I V A T E   D A T A   D E C L A R A T I O N S          *
  *************************************************************************/
@@ -90,155 +98,165 @@ app_simulator_data_S app_simulator_data;
  *                   P R I V A T E   F U N C T I O N S                   *
  *************************************************************************/
 
-// Works on a per node basis
-static void app_simulator_collision_detected(Queue* node, double currentTime)
+
+
+
+static int app_simulator_find_earliest_timestamp(void)
 {
-    int returnCount = 0;
-    // Increment the Queue collision counter
-    Queue_Increment_Collision(node);
-    // Choose a random var
-    int K_pick = return_random(pow(2,Queue_Collision_Count(node))-1);
-
-    if(Queue_Collision_Count(node) > 10)
-    {
-        Queue_Dequeue(node);
-        Queue_Reset_Collision(node);
-    }
-
-    else
-    {
-        // Calculate exponential backoff time and update all Queue values to correspond to this
-        double wait_time = currentTime + (double)K_pick*512.0*(1/app_simulator_data.R);
-        if (wait_time >= app_simulator_data.simulationTimeSecs)
-	{
-	    Queue_Dequeue(node);
-            Queue_Reset_Collision(node);
-	}
-	// If wait time is not greater than sim time, update all node values less than this wait time to be later than 
-	// this wait time
-	else
-	{
-		 returnCount = Queue_update_times(node, wait_time);
-		 app_simulator_data.transmitted_packets += returnCount;
-	}
-    }
-
-}
-
-// Works on a per node basis
-static void app_simulator_bus_busy(Queue* node, double localSendTime)
-{
-    // Dummy var so that I can use the same function
-    int returnCount;
-    if (Queue_PeekHead(node) < localSendTime)
-    {
-        returnCount =  Queue_update_times(node, localSendTime);
-    }
-}
-
-static double app_simulator_persistent_sensing(void)
-{
-    int i, minTimeNode, isCollisionDetected = 0;
-    double minTimeStamp = DBL_MAX;
-    double maxSendTime = 0, localSendTime = 0, ret = 0;
-    double node_heads[app_simulator_data.N];
-
-    // Check to see if bus is occupied. If occupied, Update the other node times to accomodate
-    if(app_simulator_data.shared_bus->size != 0)
-    {
-        for (i = 0; i < app_simulator_data.N; i++)
-        {
-            // Skip if current node transmitting
-            if(i == app_simulator_data.shared_bus_sending_node)
-            {
-                continue;
-            }
-
-       	    // Calculate time to send to each node and them update the queues if needed
-            localSendTime = app_simulator_data.T_trans*app_simulator_data.num_packets_to_send + (app_simulator_data.T_prop * abs(app_simulator_data.shared_bus_sending_node-i));
-            if (localSendTime > app_simulator_data.simulationTimeSecs) 
-            {
-                continue;
-            }
-            app_simulator_bus_busy(app_simulator_data.nodes[i], localSendTime);
-        }
-
-        // Dequeue current packet from shared bus.
-        app_simulator_data.num_packets_to_send = 0;
-	ret = Queue_Dequeue(app_simulator_data.shared_bus);
-        return ret;
-    }
-    
-    else {
-
-        // Bus is empty. Can send packet
-        for (i = 0; i < app_simulator_data.N; i++)
+    int minTimeNode;
+    for (i = 0; i < app_simulator_data.N; i++)
         {
             // Check for lowest timestamp
             // TODO: Confirm lowest timestamp against waiting value for exponential backoff
             node_heads[i] = Queue_PeekHead(app_simulator_data.nodes[i]);
             if (node_heads[i] < minTimeStamp)
             {
-                minTimeStamp = node_heads[i];
                 minTimeNode = i;
             }
-
         }
 
-        if (minTimeStamp == -1)
+    return minTimeNode;
+}
+
+
+static int app_simulator_check_collision(int minTimeNode)
+{
+    int isCollisionDetected = 0;
+    double localSendTime = 0, currentNodeTimestamp;
+    double currTransmissionTime = Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
+    for (int i = 0; i < app_simulator_data.N; i++)
+    {
+        currentNodeTimestamp = Queue_PeekHead(app_simulator_data.nodes[i]);
+        // Skip the node with the lowest timestep aka the node we're checking against for collisions
+        if (i == minTimeNode || currentNodeTimestamp == -1)
         {
-            return -1;
+            continue;
         }
 
-        // Scan through heads of all the nodes to determine which nodes will experience a collision
-        for (i = 0; i < app_simulator_data.N; i++)
+        // Check how long it will take for first bit of current packet to reach selected node 
+        localSendTime = currTransmissionTime + (app_simulator_data.T_prop*(abs(minTimeNode - i)));
+
+        if (currentNodeTimestamp <= localSendTime)
         {
-            // Skip the node with the lowest timestep aka the node we're checking against for collisions
-            if (i == minTimeNode)
+            isCollisionDetected = 1;
+
+            Queue_Increment_Collision(app_simulator_data.nodes[i]);
+            Queue_Increment_Collision(app_simulator_data.nodes[minTimeNode])
+
+
+            // Reset if greater than 10
+            if (Queue_Collision_Count(app_simulator_data.nodes[minTimeNode]) == 10)
             {
-                continue;
+                Queue_Dequeue(app_simulator_data.nodes[minTimeNode]);
+                Queue_Reset_Collision(app_simulator_data.nodes[minTimeNode]);
             }
 
-            // Check how long it will take for first bit of current packet to reach selected node 
-            localSendTime = minTimeStamp + (app_simulator_data.T_prop*(abs(minTimeNode - i)));
-
-            if (node_heads[i] < localSendTime)
+            if (Queue_Collision_Count(app_simulator_data.nodes[i]) == 10)
             {
-                isCollisionDetected = 1;
-                app_simulator_collision_detected(app_simulator_data.nodes[i], minTimeStamp);
-                app_simulator_collision_detected(app_simulator_data.nodes[minTimeNode],minTimeStamp);
- 		ret = minTimeStamp;
+                Queue_Dequeue(app_simulator_data.nodes[i]);
+                Queue_Reset_Collision(app_simulator_data.nodes[i]);
+                return isCollisionDetected;
             }
 
-        }
+            // Update the transmission times of the transmitting node
+            double R = return_random(pow(2, Queue_Collision_Count(transmittingNode)) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
+            double T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+            double unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
+            Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
+            app_simulator_data.transmitted_packets++;
 
-        if (!isCollisionDetected)
-        {
-            // Dequeue packet
-            do{
-                localSendTime = Queue_Dequeue(app_simulator_data.nodes[minTimeNode]);
-                app_simulator_data.transmitted_packets++;
-                app_simulator_data.successfully_transmitted_packets++;
-                app_simulator_data.num_packets_to_send++;
-	    } while(Queue_PeekHead(app_simulator_data.nodes[minTimeNode]) == localSendTime);
-       	    Queue_Reset_Collision(app_simulator_data.nodes[minTimeNode]);
-	    
-            // next packet arrival time is less than current arrival time but if thats happening then I have a whole other butthole issue
+            // Update the transmission times of the current node
+            R = return_random(pow(2, Queue_Collision_Count(i)) - 1);
+            T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+            unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[i]);
+            Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
+            app_simulator_data.transmitted_packets++;
+
             
-            if (localSendTime == -1)
-            {
-                return -1;
-            }
-
-            // Enqueue packet onto shared bus and set the shared bus node to the transmitting node
-            Queue_Enqueue(app_simulator_data.shared_bus, localSendTime);
-            app_simulator_data.shared_bus_sending_node = minTimeNode;
-            ret = minTimeStamp;
 
         }
-        return ret;
+
+        return isCollisionDetected;
+
+    }
+}
+
+
+static void app_simulator_no_collision(int minTimeNode)
+{
+
+    // Dequeue the node to be transmitted
+    double localSendTime = Queue_Dequeue(app_simulator_data.nodes[minTimeNode]);
+    app_simulator_data.transmitted_packets++;
+    app_simulator_data.successfully_transmitted_packets++;
+
+    // Reset the collision counter for this node
+    Queue_Reset_Collision(app_simulator_data.nodes[minTimeNode]);
+    app_simulator_data.current_time = minTimeStamp;
+
+    if (localSendTime == -1)
+    {
+        return -1;
+    }
+
+    // Set status of the shared bus 
+    app_simulator_data.shared_bus.isBusy = 1;
+    app_simulator_data.shared_bus.currentTime = localSendTime;
+    app_simulator_data.shared_bus.sendingNode = minTimeNode;
+
+}
+
+
+static void app_simulator_bus_busy(void)
+{
+    for (int i = 0; i < app_simulator_data.N; i++)
+    {
+        // If current node, skip
+        if (i == app_simulator_data.shared_bus.sendingNode)
+        {
+            continue;
+        }
+
+        // Calculate time to receive total packet for each node
+        double timeTotalPacketSend = app_simulator_data.shared_bus.currentTime + app_simulator_data.T_trans + (app_simulator_data.T_prop*(abs(app_simulator_data.shared_bus.sendingNode - i)));
+        double curNodeTime = Queue_PeekHead(app_simulator_data.nodes[i]);
+
+        // If arrival packet less than time for bus to be unbusy, update times
+        if (curNodeTime <= timeTotalPacketSend)
+        {
+            Queue_update_times(app_simulator_data.nodes[i], timeTotalPacketSend);
+        }
+        
+        
+    }
+
+    app_simulator_data.shared_bus.isBusy = 0;
+    app_simulator_data.shared_bus.currentTime = -1;
+    app_simulator_data.shared_bus.sendingNode = -1;
+}
+
+static void app_simulator_persistent_sensing(void)
+{
+    int earliestTransmissionNode, isCollision;
+    earliestTransmissionNode = app_simulator_find_earliest_timestamp();
+    isCollision = app_simulator_check_collision(earliestTransmissionNode);
+
+    if(app_simulator_data.shared_bus.isBusy)
+    {
+        app_simulator_bus_busy();
+    }
+
+
+    if (isCollision)
+    {
+        return;
+    }
+    else
+    {
+        app_simulator_no_collision(earliestTransmissionNode)
     }
     
+
 }
 
 
@@ -263,6 +281,9 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
     app_simulator_data.T_trans = L/R;
     app_simulator_data.nodes = malloc(N*sizeof(Queue*));
     app_simulator_data.shared_bus = Queue_Init(1, -1);
+    app_simulator_data.shared_bus.isBusy = 0;
+    app_simulator_data.shared_bus.currentTime = 0;
+    app_simulator_data.shared_bus.sendingNode = -1;
 
 
     // Calculate lambda
@@ -333,8 +354,10 @@ void app_simulator_deinit(void)
 
 void app_simulator_print_results(void)
 {
+    double efficiency = (app_simulator_data.successfully_transmitted_packets/app_simulator_data.successfully_transmitted_packets)
 	printf("Transmitted packets %f\r\n", app_simulator_data.transmitted_packets);
-	printf("Success packets %f\r\n", app_simulator_data.successfully_transmitted_packets);
+	printf("Successfully transmitted packets %f\r\n", app_simulator_data.successfully_transmitted_packets);
+    printf("Efficiency rate %f\r\n" efficiency); 
 
 }
 
