@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include "queue.h"
 #include <float.h>
+#include <stdbool.h>
 
 /*************************************************************************
  *                            D E F I N E S                              *
@@ -71,12 +72,12 @@ static double app_simulator_persistent_sensing(void);
 /**
  * @brief Perform operations on a node when collision is detected
  */
-static void app_simulator_collision_detected(Queue* node);
+//static void app_simulator_collision_detected(Queue* node);
 
 /**
  * @brief Check to see if current node head is scheduled to arrive before bus send is over. If so, update node values
  */
-static void app_simulator_bus_busy(Queue* node, double localSendTime);
+//static void app_simulator_bus_busy(Queue* node, double localSendTime);
 
 /*************************************************************************
  *            P R I V A T E   D A T A   D E C L A R A T I O N S          *
@@ -88,6 +89,7 @@ app_simulator_data_S app_simulator_data;
  *                   P R I V A T E   F U N C T I O N S                   *
  *************************************************************************/
 
+/*
 // Works on a per node basis
 static void app_simulator_collision_detected(Queue* node)
 {
@@ -123,7 +125,9 @@ static void app_simulator_collision_detected(Queue* node)
     }
 
 }
+*/
 
+/*
 // Works on a per node basis
 static void app_simulator_bus_busy(Queue* node, double localSendTime)
 {
@@ -134,6 +138,7 @@ static void app_simulator_bus_busy(Queue* node, double localSendTime)
         returnCount =  Queue_update_times(node, localSendTime);
     }
 }
+*/
 
 /**
  *  @brief  Finds the earliest timestamp in all the nodes
@@ -142,6 +147,7 @@ static void app_simulator_bus_busy(Queue* node, double localSendTime)
 unsigned int app_simulator_private_findEarliestTimestamp(void)
 {
     double minTimeStamp = DBL_MAX;
+    unsigned int minTimestampIndex = 0;
 
     for (unsigned int i = 0; i < app_simulator_data.N; i++)
     {
@@ -150,8 +156,11 @@ unsigned int app_simulator_private_findEarliestTimestamp(void)
         if ((currentNodeEarliestTimestamp != -1) && (currentNodeEarliestTimestamp < minTimeStamp))
         {
             minTimeStamp = currentNodeEarliestTimestamp;
+            minTimestampIndex = i;
         }
     }
+
+    return minTimestampIndex;
 }
 
 /**
@@ -164,6 +173,7 @@ bool app_simulator_private_checkCollision(unsigned int transmittingNode)
 {
     bool collisionDetected = false;
     double transmissionTimestamp = Queue_PeekHead(app_simulator_data.nodes[transmittingNode]);
+    unsigned int farthestCollisionNodeIndex = transmittingNode;
 
     for (unsigned int i = 0; i < app_simulator_data.N; i++)
     {
@@ -174,6 +184,7 @@ bool app_simulator_private_checkCollision(unsigned int transmittingNode)
         }
 
         double firstBitArrivalTime = transmissionTimestamp + (app_simulator_data.T_prop*(abs(transmittingNode - i)));
+        app_simulator_data.transmitted_packets++;
 
         /** 
          *  If the first bit arrival time is after the earliest timestamp in the node, then the node will
@@ -202,28 +213,93 @@ bool app_simulator_private_checkCollision(unsigned int transmittingNode)
                 Queue_Reset_Collision(app_simulator_data.nodes[i]);
             }
 
-            // Update the transmission times of the transmitting node
-            double R = return_random(pow(2, Queue_Collision_Count(transmittingNode)) - 1);
-            double T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-            double unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[transmittingNode]);
-            Queue_update_times(app_simulator_data.nodes[transmittingNode], unblockTimestamp);
+            if (abs(transmittingNode - i) > abs(transmittingNode - farthestCollisionNodeIndex))
+            {
+                farthestCollisionNodeIndex = i;
+            }
 
             // Update the transmission times of the current node
-            R = return_random(pow(2, Queue_Collision_Count(i)) - 1);
-            T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-            unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[i]);
+            double R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[i])) - 1);
+            double T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+            double unblockTimestamp = T_waiting + app_simulator_data.T_trans + (app_simulator_data.T_prop * abs(transmittingNode - i))
+                                        + Queue_PeekHead(app_simulator_data.nodes[i]);
             Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
         }
+    }
+
+    /**
+     *  Update the transmitting node timestamps based on the collision
+     *  time of the farthest node
+     */
+    if (collisionDetected == true)
+    {
+        // Update the transmission times of the transmitting node
+        double R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[transmittingNode])) - 1);
+        double T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+        double T_propFarthest = app_simulator_data.T_prop * abs(transmittingNode - farthestCollisionNodeIndex);
+        double unblockTimestamp = T_waiting + T_propFarthest + Queue_PeekHead(app_simulator_data.nodes[transmittingNode]);
+        Queue_update_times(app_simulator_data.nodes[transmittingNode], unblockTimestamp);
     }
 
     return collisionDetected;
 }
 
-void app_simulator_persistent_sensing(void)
+void app_simulator_private_updateNodes(unsigned int transmittingNodeIndex, double transmissionTimestamp)
 {
-    unsigned int earliestNodeIndex = app_simulator_private_findEarliestTimestamp();
+    double lastBitTimestamp = 0;
+    double propDelay = 0;
+
+    for (unsigned int i = 0; i < app_simulator_data.N; i++)
+    {
+        if (i == transmittingNodeIndex)
+        {
+            continue;
+        }
+
+        propDelay = (app_simulator_data.T_prop * abs(i - transmittingNodeIndex));
+        lastBitTimestamp = transmissionTimestamp + propDelay + app_simulator_data.T_trans;
+
+        Queue_update_times(app_simulator_data.nodes[i], lastBitTimestamp);
+    }
 }
 
+double app_simulator_persistent_sensing(void)
+{
+    unsigned int earliestNodeIndex = app_simulator_private_findEarliestTimestamp();
+    double timestamp = Queue_PeekHead(app_simulator_data.nodes[earliestNodeIndex]);
+    bool collisionOccurred = app_simulator_private_checkCollision(earliestNodeIndex);
+
+    /**
+     *  If a collision has occurred, the checkCollision function will handle updating
+     *  the timestamps of the packets in both of the nodes involved in the collision
+     *  by performing the exponential back-off.
+     * 
+     *  We just need to handle the case where a collision has not occurred.
+     */
+    if (collisionOccurred == false)
+    {
+        // Dequeue packet from transmitting node
+        timestamp = Queue_Dequeue(app_simulator_data.nodes[earliestNodeIndex]);
+
+        /**
+         *  Check if the timestamp from the transmitting node is within
+         *  simulation parameters. If the timestamp is not within parameters,
+         *  do nothing.
+         */
+        if ((timestamp == -1) || (timestamp > app_simulator_data.simulationTimeSecs))
+        {
+            return timestamp;
+        }
+
+        app_simulator_data.successfully_transmitted_packets++;
+
+        app_simulator_private_updateNodes(earliestNodeIndex, timestamp);
+    }
+
+    return timestamp;
+}
+
+/*
 static double app_simulator_persistent_sensing(void)
 {
     int i, minTimeNode, isCollisionDetected = 0;
@@ -322,6 +398,7 @@ static double app_simulator_persistent_sensing(void)
     }
     
 }
+*/
 
 
 /*************************************************************************
@@ -363,7 +440,7 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
             // Generate random timestamps
             currentTime = timestamp_generate(app_simulator_data.A, currentTime);
 
-            if (currentTime >= app_simulator_data.simulationTimeSecs) // Check this condition. It might mess things up in the logic.
+            if (currentTime >= app_simulator_data.simulationTimeSecs + 1) // Check this condition. It might mess things up in the logic.
             // Maybe should check nodes for this value? not sure
             {
                 currentTime = -1;
@@ -414,9 +491,11 @@ void app_simulator_deinit(void)
 
 void app_simulator_print_results(void)
 {
-	printf("Transmitted packets %f\r\n", app_simulator_data.transmitted_packets);
-	printf("Success packets %f\r\n", app_simulator_data.successfully_transmitted_packets);
+    double efficiency = ((double)app_simulator_data.successfully_transmitted_packets/(double)app_simulator_data.transmitted_packets);
+    double throughput = (app_simulator_data.successfully_transmitted_packets * app_simulator_data.L)/(app_simulator_data.simulationTimeSecs * 1000000);
 
+	printf("Transmitted packets: %f\r\n", app_simulator_data.transmitted_packets);
+	printf("Successfully transmitted packets: %f\r\n", app_simulator_data.successfully_transmitted_packets);
+    printf("Efficiency rate: %f\r\n", efficiency);
+    printf("Throughput: %f Mbps\r\n\r\n", throughput);
 }
-
-

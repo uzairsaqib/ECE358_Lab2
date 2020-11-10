@@ -13,38 +13,61 @@
 // QUESTION 
 int main(void)
 {
-    double simTime = 5000.0;
-    double A = 5.0;
+    double simTime = 1000.0;
+    double A = 7.0;
     double L = 1500.0;
-    double R = 1.0;
-    double N = 20.0;
+    double R = 1000000.0;
     double D = 10.0;
     double S = (2.0/3.0)*3.0*100000000.0;
-    
 
-    double timeStamp = 0;
-
-    app_simulator_init(simTime, A, L, R, N, D, S);
-
-    while(timeStamp >= 0)
+    printf("SIMULATION A = %f =============================================\r\n", A);
+    for (double N = 20; N < 120; N += 20)
     {
-        timeStamp =  app_simulator_run();
-	printf("The time is %f\r\n", timeStamp);
+        app_simulator_init(simTime, A, L, R, N, D, S);
+
+        double timeStamp = 0;
+        while((timeStamp != -1) && (timeStamp < simTime))
+        {
+            timeStamp =  app_simulator_run();
+            //printf("CurTime: %f\r\n", timeStamp);
+        }
+
+        app_simulator_print_results();
+        app_simulator_deinit();
+        timeStamp = 0;
     }
-    app_simulator_print_results();
-    app_simulator_deinit();
-    
+
+    A = 10;
+    printf("SIMULATION A = %f =============================================\r\n", A);
+    for (double N = 20; N < 120; N += 20)
+    {
+        app_simulator_init(simTime, A, L, R, N, D, S);
+
+        double timeStamp = 0;
+        while((timeStamp != -1) && (timeStamp < simTime))
+        {
+            timeStamp =  app_simulator_run();
+        }
+
+        app_simulator_print_results();
+        app_simulator_deinit();
+        timeStamp = 0;
+    }
+
+    A = 20;
+    printf("SIMULATION A = %f =============================================\r\n", A);
+    for (double N = 20; N < 120; N += 20)
+    {
+        app_simulator_init(simTime, A, L, R, N, D, S);
+
+        double timeStamp = 0;
+        while((timeStamp != -1) && (timeStamp < simTime))
+        {
+            timeStamp =  app_simulator_run();
+        }
+
+        app_simulator_print_results();
+        app_simulator_deinit();
+        timeStamp = 0;
+    }
 }
-
-/*
-int main(void)
-{
-    app_simulator_init(100);
-
-    while (app_simulator_run() != APP_SIMULATOR_RET_SIM_COMPLETE);
-
-    app_simulator_outputResults();
-
-    return 0;
-}
-*/
