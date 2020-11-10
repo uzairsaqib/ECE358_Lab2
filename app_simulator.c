@@ -163,23 +163,23 @@ static int app_simulator_check_collision(int minTimeNode)
             }
 
             // Update the transmission times of the transmitting node
-            if(Queue_Collision_Count(app_simulator_data.nodes[minTimeNode]) > 0)
-            {
+            //if(Queue_Collision_Count(app_simulator_data.nodes[minTimeNode]) > 0)
+            //{
                 R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
                 T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
                 unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
                 Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
-            }
+            //}
 
             // Update the transmission times of the current node
-            if(Queue_Collision_Count(app_simulator_data.nodes[i]) > 0)
-            {
+            //if(Queue_Collision_Count(app_simulator_data.nodes[i]) > 0)
+            //{
                 R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[i])) - 1);
                 T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
                 unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[i]);
                 Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
                 app_simulator_data.transmitted_packets++;
-            }
+            //}
             
 
         }
@@ -201,8 +201,12 @@ static double app_simulator_no_collision(int minTimeNode)
 
     // Dequeue the node to be transmitted
     double localSendTime = Queue_Dequeue(app_simulator_data.nodes[minTimeNode]);
-    app_simulator_data.transmitted_packets++;
-    app_simulator_data.successfully_transmitted_packets++;
+
+    if (localSendTime < app_simulator_data.simulationTimeSecs)
+    {
+        app_simulator_data.transmitted_packets++;
+        app_simulator_data.successfully_transmitted_packets++;
+    }
 
     // Reset the collision counter for this node
     Queue_Reset_Collision(app_simulator_data.nodes[minTimeNode]);
@@ -381,4 +385,7 @@ void app_simulator_print_results(void)
     printf("Throughput: %f Mbps\r\n\r\n", throughput);
 }
 
-
+double app_simulator_totalTransmittedPackets(void)
+{
+    return app_simulator_data.transmitted_packets;
+}

@@ -128,12 +128,10 @@ int Queue_Collision_Count(const Queue* q)
 void Queue_update_times(Queue* q, double wait_time)
 {
   int pos = q->head;
-  int count = 0;
   while(q->arr[pos]<wait_time)
   {
     q->arr[pos] = wait_time;
-    ++pos;
-    ++count;
+    pos = (pos + 1)%q->capacity;
   } 
 }
 

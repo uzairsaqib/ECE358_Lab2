@@ -13,7 +13,7 @@
 // QUESTION 
 int main(void)
 {
-    double simTime = 1000.0;
+    double simTime = 1500.0;
     double A = 7.0;
     double L = 1500.0;
     double R = 1000000.0;
@@ -29,6 +29,11 @@ int main(void)
         while(timeStamp <= simTime)
         {
             timeStamp =  app_simulator_run();
+
+            if (app_simulator_totalTransmittedPackets() > (A * simTime * N))
+            {
+                break;
+            }
         }
 
         app_simulator_print_results();
@@ -45,6 +50,11 @@ int main(void)
         while(timeStamp <= simTime)
         {
             timeStamp =  app_simulator_run();
+
+            if (app_simulator_totalTransmittedPackets() > (A * simTime * N))
+            {
+                break;
+            }
         }
 
         app_simulator_print_results();
@@ -61,6 +71,11 @@ int main(void)
         while(timeStamp <= simTime)
         {
             timeStamp =  app_simulator_run();
+
+            if (app_simulator_totalTransmittedPackets() > (A * simTime * N))
+            {
+                break;
+            }
         }
 
         app_simulator_print_results();

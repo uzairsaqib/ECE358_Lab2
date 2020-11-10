@@ -49,6 +49,8 @@ double app_simulator_run(void);
 
 void app_simulator_print_results(void);
 
+double app_simulator_totalTransmittedPackets(void);
+
 // /**
 //  *  @brief  Output the results of the simulation
 //  */
