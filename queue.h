@@ -109,12 +109,21 @@ void Queue_Reset_Collision(Queue*q);
  */
 int Queue_Collision_Count(const Queue* q);
 
+/**
+ *  @return Number of attempts encountered by the
+ *          node when sensing that the bus is busy
+ */
 int Queue_non_persistant_count(const Queue* q);
 
+/**
+ *  @brief  Increments the number of attempts
+ */
 void Queue_non_persistant_increment(Queue* q);
 
+/**
+ *  @brief  Resets the attempts counter
+ */
 void Queue_non_persistant_reset(Queue *q);
-
 
 /**
  * @brief Update the values of a queue's packets

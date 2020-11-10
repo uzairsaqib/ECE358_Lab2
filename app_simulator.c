@@ -19,6 +19,8 @@
  *                            D E F I N E S                              *
  *************************************************************************/
 
+#define SIMULATE_PERSISTENT_CASE         (1U)
+
 #define APP_SIMULATOR_PROGRESS           (0U)
 #define APP_SIMULATOR_QUEUE_DEFAULT_SIZE (1000000000)
 
@@ -74,20 +76,58 @@ typedef struct
  *************************************************************************/
 
 /**
- * @brief Persistent carrier sensing
+ *  @brief  Application for persistent carrier sensing simulation
+ *  @return The timestamp of the last transmitted packet
  */
 static double app_simulator_persistent_sensing(void);
 
 /**
- * @brief Handle updating times if bus is busy
+ *  @brief  Finds nodes that have a packet departure after the first
+ *          bit arrival but before the last bit arrival and updates
+ *          the timestamps of these packets
+ *          (for persistent simulation)
  */
 static void app_simulator_bus_busy(void);
 
+/**
+ *  @brief  Finds nodes that have a packet departure after the first
+ *          bit arrival but before the last bit arrival and updates
+ *          the timestamps of these packets with an applied
+ *          exponential back-off
+ *          (for non-persisten simulation)
+ */
+static void app_simulator_bus_busy_non_persistent(void);
+
+/**
+ *  @brief  Finds the node with the earliest packet to transmit
+ *  @return Index of the node with the earliest packet
+ */
 static int app_simulator_find_earliest_timestamp(void);
 
+/**
+ *  @brief  Checks if any nodes have packets scheduled to depart
+ *          prior to the arrival of the first bit from the transmitting
+ *          node (collision event) and applies an exponential backoff to
+ *          both the transmitting node and the receiving node in the
+ *          event of a collision
+ *  @return [1] if one or more collisions were detected
+ *          [0] if no collisions were detected
+ */
 static int app_simulator_check_collision(int minTimeNode);
 
+/**
+ *  @brief  Handles the case where the transmitting node can transmit a
+ *          packet without colliding with any of the other nodes
+ *  @return Timestamp of the successful packet
+ */
 static double app_simulator_no_collision(int minTimeNode);
+
+/**
+ *  @brief  Performs the exponential back-off calculation for the
+ *          non-persistent simulation case and updates timestamps
+ *          accordingly
+ */
+static void app_simulator_non_persistant_backoff_calculation(Queue* node, double timeTotalPacketSend);
 /*************************************************************************
  *            P R I V A T E   D A T A   D E C L A R A T I O N S          *
  *************************************************************************/
@@ -98,9 +138,6 @@ app_simulator_data_S app_simulator_data;
  *                   P R I V A T E   F U N C T I O N S                   *
  *************************************************************************/
 
-
-
-
 static int app_simulator_find_earliest_timestamp(void)
 {
     int minTimeNode;
@@ -109,19 +146,18 @@ static int app_simulator_find_earliest_timestamp(void)
 
 
     for (int i = 0; i < app_simulator_data.N; i++)
+    {
+        // Check for lowest timestamp
+        currentNodeEarliestTimestamp = Queue_PeekHead(app_simulator_data.nodes[i]);
+        if ((currentNodeEarliestTimestamp != -1) && (currentNodeEarliestTimestamp < minTimeStamp))
         {
-            // Check for lowest timestamp
-            currentNodeEarliestTimestamp = Queue_PeekHead(app_simulator_data.nodes[i]);
-            if ((currentNodeEarliestTimestamp != -1) && (currentNodeEarliestTimestamp < minTimeStamp))
-            {
-                minTimeNode = i;
-                minTimeStamp = currentNodeEarliestTimestamp;
-            }
+            minTimeNode = i;
+            minTimeStamp = currentNodeEarliestTimestamp;
         }
+    }
 
     return minTimeNode;
 }
-
 
 static int app_simulator_check_collision(int minTimeNode)
 {
@@ -132,7 +168,11 @@ static int app_simulator_check_collision(int minTimeNode)
     for (int i = 0; i < app_simulator_data.N; i++)
     {
         currentNodeTimestamp = Queue_PeekHead(app_simulator_data.nodes[i]);
-        // Skip the node with the lowest timestep aka the node we're checking against for collisions
+
+        /**
+         *  If the currentNode is the transmitting node or the current node
+         *  has an invalid timestamp then skip this node and do nothing
+         */
         if (i == minTimeNode || currentNodeTimestamp == -1)
         {
             continue;
@@ -148,8 +188,10 @@ static int app_simulator_check_collision(int minTimeNode)
 
         if (currentNodeTimestamp <= localSendTime)
         {
-            
-
+            /**
+             *  The collision count should only be incremented once per
+             *  loop for the transmitting node
+             */
             if(!isCollisionDetected)
             {
                 Queue_Increment_Collision(app_simulator_data.nodes[i]);
@@ -157,20 +199,23 @@ static int app_simulator_check_collision(int minTimeNode)
             Queue_Increment_Collision(app_simulator_data.nodes[minTimeNode]);
 
             isCollisionDetected = 1;
-            // Reset if greater than 10
+            
+            /**
+             *  Check if the collision counters of either of the nodes involved
+             *  in the collision have reached the drop-threshold (10 successive collisions)
+             */
             if (Queue_Collision_Count(app_simulator_data.nodes[minTimeNode]) == 10)
             {
                 Queue_Dequeue(app_simulator_data.nodes[minTimeNode]);
                 Queue_Reset_Collision(app_simulator_data.nodes[minTimeNode]);
             }
-
             if (Queue_Collision_Count(app_simulator_data.nodes[i]) == 10)
             {
                 Queue_Dequeue(app_simulator_data.nodes[i]);
                 Queue_Reset_Collision(app_simulator_data.nodes[i]);
             }
 
-            
+            // Apply exponential back-off to the receiving node
             if(Queue_Collision_Count(app_simulator_data.nodes[i]) > 0)
             {
                 R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[i])) - 1);
@@ -179,25 +224,20 @@ static int app_simulator_check_collision(int minTimeNode)
                 Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
                 app_simulator_data.transmitted_packets++;
             }
-
         }
-        
     }
 
     if(isCollisionDetected)
     {
+        // Apply exponential back-off to the transmitting node
         if(Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])>0)
         {
-            R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
+            R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1);
             T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
             unblockTimestamp = (T_waiting) + farthestCollisionTime;
             Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
         }
     }
-    
-        // Due to the transmitting node
-        // app_simulator_data.transmitted_packets++;
-    
 
     return isCollisionDetected;
 }
@@ -205,10 +245,10 @@ static int app_simulator_check_collision(int minTimeNode)
 
 static double app_simulator_no_collision(int minTimeNode)
 {
-
-    // Dequeue the node to be transmitted
+    // Dequeue the packet to be transmitted
     double localSendTime = Queue_Dequeue(app_simulator_data.nodes[minTimeNode]);
 
+    // Update metrics if this is a valid timestamp withing simulation parameters
     if (localSendTime < app_simulator_data.simulationTimeSecs)
     {
         app_simulator_data.transmitted_packets++;
@@ -230,7 +270,6 @@ static double app_simulator_no_collision(int minTimeNode)
     app_simulator_data.shared_bus.sendingNode = minTimeNode;
 
     return localSendTime;
-
 }
 
 static void app_simulator_non_persistant_backoff_calculation(Queue* node, double timeTotalPacketSend)
@@ -258,7 +297,6 @@ static void app_simulator_non_persistant_backoff_calculation(Queue* node, double
 
     Queue_update_times(node, T_backoff);
 }
-
 
 static void app_simulator_bus_busy(void)
 {
@@ -291,8 +329,6 @@ static void app_simulator_bus_busy(void)
         {
             Queue_update_times(app_simulator_data.nodes[i], timeTotalPacketSend);
         }
-        
-        
     }
 
     app_simulator_data.shared_bus.isBusy = 0;
@@ -439,9 +475,11 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
 
 double app_simulator_run(void)
 {
-
-    return app_simulator_persistent_sensing();
-    
+    #if (SIMULATE_PERSISTENT_CASE == 1U)
+        return app_simulator_persistent_sensing();
+    #else
+        return app_simulator_non_persistent_sensing();
+    #endif 
 }
 
 void app_simulator_deinit(void)
@@ -451,8 +489,6 @@ void app_simulator_deinit(void)
         Queue_Delete(app_simulator_data.nodes[i]);
         app_simulator_data.nodes[i] = NULL;
     }
-
-
 }
 
 void app_simulator_print_results(void)
