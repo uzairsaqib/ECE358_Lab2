@@ -19,6 +19,8 @@
  *                            D E F I N E S                              *
  *************************************************************************/
 
+#define SIMULATE_PERSISTENT_CASE         (1U)
+
 #define APP_SIMULATOR_PROGRESS           (0U)
 #define APP_SIMULATOR_QUEUE_DEFAULT_SIZE (1000000000)
 
@@ -74,20 +76,39 @@ typedef struct
  *************************************************************************/
 
 /**
- * @brief Persistent carrier sensing
+ *  @brief  Persistent carrier sensing
+ *  @return Timestamp of the last handled packet
  */
 static double app_simulator_persistent_sensing(void);
 
 /**
- * @brief Handle updating times if bus is busy
+ *  @brief  Handle updating times if bus is busy
  */
 static void app_simulator_bus_busy(void);
 
+/**
+ *  @brief  Find the node with the earliest packet
+ *  @return Index of the node with the earliest packet
+ */
 static int app_simulator_find_earliest_timestamp(void);
 
+/**
+ *  @brief  Checks if the transmitting node's packet will
+ *          collide with a packet from any other node.
+ *          If a collision occurs, this function will update
+ *          the timestamps in each node involved in the collision
+ *          by applying an exponential back-off
+ *  @return [1] if one or more collisions were detected,
+ *          [0] if no collisions were detected
+ */
 static int app_simulator_check_collision(int minTimeNode);
 
+/**
+ *  @brief  
+ *  @return 
+ */
 static double app_simulator_no_collision(int minTimeNode);
+
 /*************************************************************************
  *            P R I V A T E   D A T A   D E C L A R A T I O N S          *
  *************************************************************************/
@@ -97,9 +118,6 @@ app_simulator_data_S app_simulator_data;
 /*************************************************************************
  *                   P R I V A T E   F U N C T I O N S                   *
  *************************************************************************/
-
-
-
 
 static int app_simulator_find_earliest_timestamp(void)
 {
@@ -161,31 +179,34 @@ static int app_simulator_check_collision(int minTimeNode)
                 Queue_Reset_Collision(app_simulator_data.nodes[i]);
             }
 
+            // Apply exponential backoff to transmitting node
             R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
             T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
             unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
             Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
 
+            // Apply exponential backoff to receiving node
             R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[i])) - 1);
             T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
             unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[i]);
             Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
             app_simulator_data.transmitted_packets++;
-            
-
         }
         
     }
 
     if (isCollisionDetected == true)
     {
-        // Due to the transmitting node
+        /**
+         *  Transmitting node sends one packet which can collide
+         *  with multiple nodes, therefore we only want to increment
+         *  this counter once (outside of the for-loop) 
+         */
         app_simulator_data.transmitted_packets++;
     }
 
     return isCollisionDetected;
 }
-
 
 static double app_simulator_no_collision(int minTimeNode)
 {
@@ -214,7 +235,6 @@ static double app_simulator_no_collision(int minTimeNode)
     app_simulator_data.shared_bus.sendingNode = minTimeNode;
 
     return localSendTime;
-
 }
 
 static void app_simulator_non_persistant_backoff_calculation(Queue* node, double timeTotalPacketSend)
@@ -263,8 +283,6 @@ static void app_simulator_bus_busy(void)
         {
             Queue_update_times(app_simulator_data.nodes[i], timeTotalPacketSend);
         }
-        
-        
     }
 
     app_simulator_data.shared_bus.isBusy = 0;
@@ -402,18 +420,16 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
         } while (Queue_IsFull(node_ptr) != true);
 
         app_simulator_data.nodes[i] = node_ptr;
-    } 
-
+    }
 }
-
-
-
 
 double app_simulator_run(void)
 {
-
-    return app_simulator_non_persistent_sensing();
-    
+    #if (SIMULATE_PERSISTENT_CASE == 1U)
+        return app_simulator_persistent_sensing();
+    #else
+        return app_simulator_non_persistent_sensing();
+    #endif
 }
 
 void app_simulator_deinit(void)
@@ -423,8 +439,6 @@ void app_simulator_deinit(void)
         Queue_Delete(app_simulator_data.nodes[i]);
         app_simulator_data.nodes[i] = NULL;
     }
-
-
 }
 
 void app_simulator_print_results(void)
