@@ -167,9 +167,8 @@ static int app_simulator_check_collision(int minTimeNode)
             {
                 R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
                 T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-                unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
+                unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
                 Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
-                app_simulator_data.transmitted_packets++;
             }
 
             // Update the transmission times of the current node
@@ -177,7 +176,7 @@ static int app_simulator_check_collision(int minTimeNode)
             {
                 R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[i])) - 1);
                 T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-                unblockTimestamp = T_waiting + Queue_PeekHead(app_simulator_data.nodes[i]);
+                unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[i]);
                 Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
                 app_simulator_data.transmitted_packets++;
             }
@@ -186,6 +185,13 @@ static int app_simulator_check_collision(int minTimeNode)
         }
         
     }
+
+    if (isCollisionDetected == true)
+    {
+        // Due to the transmitting node
+        app_simulator_data.transmitted_packets++;
+    }
+
     return isCollisionDetected;
 }
 
