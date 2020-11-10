@@ -128,6 +128,7 @@ static int app_simulator_check_collision(int minTimeNode)
     int isCollisionDetected = 0;
     double localSendTime = 0, currentNodeTimestamp, R, T_waiting, unblockTimestamp;
     double currTransmissionTime = Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
+    double farthestCollisionTime = 0;
     for (int i = 0; i < app_simulator_data.N; i++)
     {
         currentNodeTimestamp = Queue_PeekHead(app_simulator_data.nodes[i]);
@@ -140,14 +141,22 @@ static int app_simulator_check_collision(int minTimeNode)
         // Check how long it will take for first bit of current packet to reach selected node 
         localSendTime = currTransmissionTime + (app_simulator_data.T_prop*(abs(minTimeNode - i)));
 
+        if(localSendTime > farthestCollisionTime)
+        {
+            farthestCollisionTime = localSendTime;
+        }
+
         if (currentNodeTimestamp <= localSendTime)
         {
-            isCollisionDetected = 1;
+            
 
-            Queue_Increment_Collision(app_simulator_data.nodes[i]);
+            if(!isCollisionDetected)
+            {
+                Queue_Increment_Collision(app_simulator_data.nodes[i]);
+            }
             Queue_Increment_Collision(app_simulator_data.nodes[minTimeNode]);
 
-
+            isCollisionDetected = 1;
             // Reset if greater than 10
             if (Queue_Collision_Count(app_simulator_data.nodes[minTimeNode]) == 10)
             {
@@ -161,27 +170,34 @@ static int app_simulator_check_collision(int minTimeNode)
                 Queue_Reset_Collision(app_simulator_data.nodes[i]);
             }
 
-            R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
-            T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-            unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
-            Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
-
-            R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[i])) - 1);
-            T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-            unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[i]);
-            Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
-            app_simulator_data.transmitted_packets++;
             
+            if(Queue_Collision_Count(app_simulator_data.nodes[i]) > 0)
+            {
+                R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[i])) - 1);
+                T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+                unblockTimestamp = (T_waiting) + localSendTime + app_simulator_data.T_trans;
+                Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
+                app_simulator_data.transmitted_packets++;
+            }
 
         }
         
     }
 
-    if (isCollisionDetected == true)
+    if(isCollisionDetected)
     {
-        // Due to the transmitting node
-        app_simulator_data.transmitted_packets++;
+        if(Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])>0)
+        {
+            R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
+            T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+            unblockTimestamp = (T_waiting) + farthestCollisionTime;
+            Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
+        }
     }
+    
+        // Due to the transmitting node
+        // app_simulator_data.transmitted_packets++;
+    
 
     return isCollisionDetected;
 }
@@ -236,7 +252,7 @@ static void app_simulator_non_persistant_backoff_calculation(Queue* node, double
         // Calculate out other values
         R = return_random(pow(2, Queue_non_persistant_count(node)) - 1);
         T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-        T_backoff = T_waiting + timeTotalPacketSend;
+        T_backoff = T_waiting + Queue_PeekHead(node);
 
     }
 
@@ -246,6 +262,18 @@ static void app_simulator_non_persistant_backoff_calculation(Queue* node, double
 
 static void app_simulator_bus_busy(void)
 {
+    int max_nodal_distance;
+
+    if(app_simulator_data.N - app_simulator_data.shared_bus.sendingNode > app_simulator_data.shared_bus.sendingNode)
+    {
+        max_nodal_distance = app_simulator_data.N - app_simulator_data.shared_bus.sendingNode;
+    }
+    else
+    {
+        max_nodal_distance = app_simulator_data.shared_bus.sendingNode;
+    }
+    
+
     for (int i = 0; i < app_simulator_data.N; i++)
     {
         // If current node, skip
@@ -255,7 +283,7 @@ static void app_simulator_bus_busy(void)
         }
 
         // Calculate time to receive total packet for each node
-        double timeTotalPacketSend = app_simulator_data.shared_bus.currentTime + app_simulator_data.T_trans + (app_simulator_data.T_prop*(abs(app_simulator_data.shared_bus.sendingNode - i)));
+        double timeTotalPacketSend = app_simulator_data.shared_bus.currentTime + app_simulator_data.T_trans + (app_simulator_data.T_prop*((double)max_nodal_distance));
         double curNodeTime = Queue_PeekHead(app_simulator_data.nodes[i]);
 
         // If arrival packet less than time for bus to be unbusy, update times
@@ -268,7 +296,7 @@ static void app_simulator_bus_busy(void)
     }
 
     app_simulator_data.shared_bus.isBusy = 0;
-    app_simulator_data.shared_bus.currentTime = -1;
+    app_simulator_data.shared_bus.currentTime = 0;
     app_simulator_data.shared_bus.sendingNode = -1;
 }
 
@@ -389,7 +417,7 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
 
             if (currentTime >= (app_simulator_data.simulationTimeSecs+10.0))
             {
-                currentTime = -1;
+                 break;
             }
 
             // Add 
@@ -412,7 +440,7 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
 double app_simulator_run(void)
 {
 
-    return app_simulator_non_persistent_sensing();
+    return app_simulator_persistent_sensing();
     
 }
 
