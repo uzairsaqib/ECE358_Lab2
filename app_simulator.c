@@ -111,7 +111,6 @@ static int app_simulator_find_earliest_timestamp(void)
     for (int i = 0; i < app_simulator_data.N; i++)
         {
             // Check for lowest timestamp
-            // TODO: Confirm lowest timestamp against waiting value for exponential backoff
             currentNodeEarliestTimestamp = Queue_PeekHead(app_simulator_data.nodes[i]);
             if ((currentNodeEarliestTimestamp != -1) && (currentNodeEarliestTimestamp < minTimeStamp))
             {
@@ -162,24 +161,16 @@ static int app_simulator_check_collision(int minTimeNode)
                 Queue_Reset_Collision(app_simulator_data.nodes[i]);
             }
 
-            // Update the transmission times of the transmitting node
-            //if(Queue_Collision_Count(app_simulator_data.nodes[minTimeNode]) > 0)
-            //{
-                R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
-                T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-                unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
-                Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
-            //}
+            R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[minTimeNode])) - 1); // Problem wherein we could reset to 0 and still be doing a backoff
+            T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+            unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[minTimeNode]);
+            Queue_update_times(app_simulator_data.nodes[minTimeNode], unblockTimestamp);
 
-            // Update the transmission times of the current node
-            //if(Queue_Collision_Count(app_simulator_data.nodes[i]) > 0)
-            //{
-                R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[i])) - 1);
-                T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
-                unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[i]);
-                Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
-                app_simulator_data.transmitted_packets++;
-            //}
+            R = return_random(pow(2, Queue_Collision_Count(app_simulator_data.nodes[i])) - 1);
+            T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+            unblockTimestamp = (T_waiting) + Queue_PeekHead(app_simulator_data.nodes[i]);
+            Queue_update_times(app_simulator_data.nodes[i], unblockTimestamp);
+            app_simulator_data.transmitted_packets++;
             
 
         }
@@ -226,6 +217,32 @@ static double app_simulator_no_collision(int minTimeNode)
 
 }
 
+static void app_simulator_non_persistant_backoff_calculation(Queue* node, double timeTotalPacketSend)
+{
+    double R, T_waiting, T_backoff; 
+
+    // Calculate our backoff value. While backoff value < bus transmission time, keep doing this
+    while(T_backoff < timeTotalPacketSend)
+    {
+        Queue_non_persistant_increment(node);
+        
+        //Drop if over 10
+        if(Queue_non_persistant_count(node) > 10)
+        {
+            Queue_Dequeue(node);
+            return;
+        }
+
+        // Calculate out other values
+        R = return_random(pow(2, Queue_non_persistant_count(node)) - 1);
+        T_waiting = R * 512 * ((double)1/(double)app_simulator_data.R);
+        T_backoff = T_waiting + timeTotalPacketSend;
+
+    }
+
+    Queue_update_times(node, T_backoff);
+}
+
 
 static void app_simulator_bus_busy(void)
 {
@@ -255,6 +272,34 @@ static void app_simulator_bus_busy(void)
     app_simulator_data.shared_bus.sendingNode = -1;
 }
 
+static void app_simulator_bus_busy_non_persistent(void)
+{
+    for (int i = 0; i < app_simulator_data.N; i++)
+    {
+        // If current node, skip
+        if (i == app_simulator_data.shared_bus.sendingNode)
+        {
+            continue;
+        }
+
+        // Calculate time to receive total packet for each node
+        double timeTotalPacketSend = app_simulator_data.shared_bus.currentTime + app_simulator_data.T_trans + (app_simulator_data.T_prop*(abs(app_simulator_data.shared_bus.sendingNode - i)));
+        double curNodeTime = Queue_PeekHead(app_simulator_data.nodes[i]);
+
+        // If arrival packet less than time for bus to be unbusy, update times
+        if (curNodeTime <= timeTotalPacketSend)
+        {
+            app_simulator_non_persistant_backoff_calculation(app_simulator_data.nodes[i], timeTotalPacketSend);
+        }
+        
+        
+    }
+
+    app_simulator_data.shared_bus.isBusy = 0;
+    app_simulator_data.shared_bus.currentTime = -1;
+    app_simulator_data.shared_bus.sendingNode = -1;
+}
+
 static double app_simulator_persistent_sensing(void)
 {
     int earliestTransmissionNode, isCollision;
@@ -262,6 +307,31 @@ static double app_simulator_persistent_sensing(void)
     if(app_simulator_data.shared_bus.isBusy)
     {
         app_simulator_bus_busy();
+    }
+    
+    earliestTransmissionNode = app_simulator_find_earliest_timestamp();
+    isCollision = app_simulator_check_collision(earliestTransmissionNode);
+    double ret;
+
+    if (isCollision)
+    {
+        ret = Queue_PeekHead(app_simulator_data.nodes[earliestTransmissionNode]);
+    }
+    else
+    {
+        ret = app_simulator_no_collision(earliestTransmissionNode);
+    }
+    
+    return ret;
+}
+
+static double app_simulator_non_persistent_sensing(void)
+{
+    int earliestTransmissionNode, isCollision;
+    
+    if(app_simulator_data.shared_bus.isBusy)
+    {
+        app_simulator_bus_busy_non_persistent();
     }
     
     earliestTransmissionNode = app_simulator_find_earliest_timestamp();
@@ -306,16 +376,10 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
     app_simulator_data.shared_bus.sendingNode = -1;
 
 
-    // Calculate lambda
-    // app_simulator_data.lambda = ((double)rho*C)/((double)L);
-    // printf("rho: %f\r\n", app_simulator_data.rho);
-
-
     // Populate nodes
     double currentTime = 0;
     for(int i = 0; i < N; i++)
     {
-        //node_ptr = malloc(app_simulator_data.N = N, sizeof(Queue *));
         Queue* node_ptr = Queue_Init(APP_SIMULATOR_QUEUE_DEFAULT_SIZE, i);
         currentTime = 0;
 	 do
@@ -323,8 +387,7 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
             // Generate random timestamps
             currentTime = timestamp_generate(app_simulator_data.A, currentTime);
 
-            if (currentTime >= (app_simulator_data.simulationTimeSecs+10.0)) // Check this condition. It might mess things up in the logic.
-            // Maybe should check nodes for this value? not sure
+            if (currentTime >= (app_simulator_data.simulationTimeSecs+10.0))
             {
                 currentTime = -1;
             }
@@ -341,16 +404,6 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
         app_simulator_data.nodes[i] = node_ptr;
     } 
 
-    /*
-    // Make sure we didn't run out of space filling up the event queues
-    if ((Queue_PeekTail(app_simulator_data.observerEvents) != -1) ||
-        Queue_PeekTail(app_simulator_data.arrivalEvents) != -1)
-    {
-        printf("ERROR: Queue overflow\r\n");
-        printf("ObserverQueueTail: %f\r\n", Queue_PeekHead(app_simulator_data.observerEvents));
-        printf("ArrivalQueueTail: %f\r\n", Queue_PeekHead(app_simulator_data.arrivalEvents));
-    }
-    */
 }
 
 
@@ -359,7 +412,7 @@ void app_simulator_init(double simulationTimeSec, double A, double L, double R, 
 double app_simulator_run(void)
 {
 
-    return app_simulator_persistent_sensing();
+    return app_simulator_non_persistent_sensing();
     
 }
 

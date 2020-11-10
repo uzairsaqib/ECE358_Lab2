@@ -13,7 +13,7 @@
 // QUESTION 
 int main(void)
 {
-    double simTime = 1500.0;
+    double simTime = 1600.0;
     double A = 7.0;
     double L = 1500.0;
     double R = 1000000.0;

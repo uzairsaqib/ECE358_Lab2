@@ -24,7 +24,7 @@
 
 typedef struct
 {
-  int64_t position, head, tail, size, capacity, collision_counter;
+  int64_t position, head, tail, size, capacity, collision_counter, non_persistant_counter;
   double backoff_value;
   double* arr;
 } Queue;
@@ -109,6 +109,11 @@ void Queue_Reset_Collision(Queue*q);
  */
 int Queue_Collision_Count(const Queue* q);
 
+int Queue_non_persistant_count(const Queue* q);
+
+void Queue_non_persistant_increment(Queue* q);
+
+void Queue_non_persistant_reset(Queue *q);
 
 
 /**

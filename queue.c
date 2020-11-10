@@ -41,6 +41,7 @@ Queue* Queue_Init(int64_t capacity, int64_t position)
   q->size = 0;
   q->backoff_value = 0;
   q->collision_counter = 0;
+  q->non_persistant_counter = 0;
   q->position = position;
   q->capacity = capacity;
   q->arr = malloc(sizeof(double) * capacity);
@@ -135,3 +136,17 @@ void Queue_update_times(Queue* q, double wait_time)
   } 
 }
 
+int Queue_non_persistant_count(const Queue* q)
+{
+  return q->non_persistant_counter;
+}
+
+void Queue_non_persistant_increment(Queue* q)
+{
+  q->non_persistant_counter++;
+}
+
+void Queue_non_persistant_reset(Queue *q)
+{
+  q->non_persistant_counter = 0;
+}
